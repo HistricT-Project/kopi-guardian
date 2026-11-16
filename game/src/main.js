@@ -18,6 +18,7 @@ import {
   ACTION_PICK_1,
   ACTION_PICK_2,
   ACTION_PICK_3,
+  ACTION_ROAST,
   createInput,
 } from './input.js';
 import { createAudio } from './audio.js';
@@ -200,6 +201,12 @@ function runGame() {
     }
     if (screen !== SCREEN_PLAY) return;
     const wantDash = Boolean(actions & ACTION_DASH);
+    if (actions & ACTION_ROAST) {
+      if (world.roastBurst()) {
+        audio.roast();
+        announce('Ledakan Sangrai! Semua hama kena.');
+      }
+    }
     const result = world.step(STEP, input.direction(), aimAngle(), wantDash);
     if (result.action === 'shoot') audio.shoot();
     else if (result.action === 'dash') audio.dash();

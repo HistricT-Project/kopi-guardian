@@ -8,7 +8,7 @@ import { EVENT_LEVELUP, EVENT_OVER, EVENT_WIN } from './world.js';
 import { SCREEN_LEVELUP, SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE, SCREEN_WIN } from './render.js';
 
 const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
+const PLAY_SECONDS = 40;
 const LEVELUP_LIMIT_SECONDS = 240;
 const END_LIMIT_SECONDS = 600;
 
@@ -96,6 +96,9 @@ export function stageShot(name, world) {
   let won = false;
   let leveled = false;
   for (let index = 0; index < limit / STEP; index += 1) {
+    // The autopilot pops the roast burst the moment the meter is full, so
+    // the play scene shows the game's signature move in action.
+    if (world.state.roast >= 100) world.roastBurst();
     const result = world.step(STEP, autopilot(world.state, reckless), aimAtNearest(world.state), false);
     if (result.events & EVENT_OVER) {
       over = true;

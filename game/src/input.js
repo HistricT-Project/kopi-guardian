@@ -10,6 +10,7 @@ export const ACTION_MUTE = 8;
 export const ACTION_PICK_1 = 16;
 export const ACTION_PICK_2 = 32;
 export const ACTION_PICK_3 = 64;
+export const ACTION_ROAST = 128;
 
 const UP = new Set(['ArrowUp', 'KeyW']);
 const DOWN = new Set(['ArrowDown', 'KeyS']);
@@ -19,6 +20,7 @@ const CONFIRM = new Set(['Space', 'Enter']);
 const PAUSE = new Set(['KeyP', 'Escape']);
 const DASH = new Set(['ShiftLeft', 'ShiftRight']);
 const MUTE = new Set(['KeyM']);
+const ROAST = new Set(['KeyE']);
 const PICK_1 = new Set(['Digit1', 'Numpad1']);
 const PICK_2 = new Set(['Digit2', 'Numpad2']);
 const PICK_3 = new Set(['Digit3', 'Numpad3']);
@@ -47,6 +49,8 @@ export function createInput(canvas) {
       if (!event.repeat) actions |= ACTION_DASH;
     } else if (MUTE.has(event.code)) {
       if (!event.repeat) actions |= ACTION_MUTE;
+    } else if (ROAST.has(event.code)) {
+      if (!event.repeat) actions |= ACTION_ROAST;
     } else if (PICK_1.has(event.code)) {
       if (!event.repeat) actions |= ACTION_PICK_1;
     } else if (PICK_2.has(event.code)) {

@@ -107,6 +107,11 @@ export function createAudio() {
     dash() {
       noise({ seconds: 0.12, volume: 0.2, frequency: 3000 });
     },
+    roast() {
+      noise({ seconds: 0.35, volume: 0.5, frequency: 700 });
+      tone({ type: 'sawtooth', from: 220, to: 40, seconds: 0.4, volume: 0.45 });
+      tone({ type: 'sine', from: 1047, to: 1568, seconds: 0.25, volume: 0.3, delay: 0.05 });
+    },
     gameOver() {
       [392, 330, 262, 196].forEach((note, i) => {
         tone({ type: 'triangle', from: note, to: note, seconds: 0.28, volume: 0.35, delay: i * 0.18 });

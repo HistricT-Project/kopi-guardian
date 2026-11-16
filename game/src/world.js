@@ -10,9 +10,11 @@ import {
   FINAL_WAVE,
   HP_SCALE_PER_WAVE,
   PLAYER,
+  ROAST,
   SCORE,
   SPAWN,
   SPEED_SCALE_PER_WAVE,
+  SPIT,
   SPRAY,
   WAVES,
   XP,
@@ -59,6 +61,7 @@ export function createWorld(random) {
     player: null,
     enemies: [],
     bullets: [],
+    enemyBullets: [],
     cherries: [],
     particles: [],
     floaters: [],
@@ -67,6 +70,12 @@ export function createWorld(random) {
     levelUpChoices: null,
     boss: null,
     ambient: [],
+    /** 0..100: fills as pests fall; at 100 the E key unleashes Ledakan Sangrai. */
+    roast: 0,
+    /** 0..1: screen shake strength, kicked by hits, the roast burst and the boss's fall. */
+    shake: 0,
+    /** { text, timer } while a wave banner is on screen, else null. */
+    banner: null,
   };
 
   function makePlayer() {
@@ -112,6 +121,7 @@ export function createWorld(random) {
     state.player = makePlayer();
     state.enemies = [];
     state.bullets = [];
+    state.enemyBullets = [];
     state.cherries = [];
     state.particles = [];
     state.floaters = [];
@@ -120,6 +130,9 @@ export function createWorld(random) {
     state.levelUpChoices = null;
     state.boss = null;
     state.ambient = [];
+    state.roast = 0;
+    state.shake = 0;
+    state.banner = null;
   }
 
   function spawnPoint() {
@@ -171,6 +184,9 @@ export function createWorld(random) {
       charging: 0,
       telegraph: 0,
       flash: 0,
+      shootTimer: kind === 'spitter' ? range(random, 1.2, 2.2) : 0,
+      enraged: false,
+      enrageTimer: 0,
     };
     state.enemies.push(enemy);
     if (kind === 'boss') {
@@ -201,6 +217,7 @@ export function createWorld(random) {
     state.spawnQueue = buildWaveQueue(wave);
     state.spawnTimer = 0.2;
     state.phase = 'fighting';
+    state.banner = { text: wave >= FINAL_WAVE ? 'GELOMBANG TERAKHIR — KUMBANG RAJA!' : `GELOMBANG ${wave}`, timer: 1.8 };
   }
 
   function burst(x, y, color, count, speed) {
@@ -235,6 +252,34 @@ export function createWorld(random) {
     });
   }
 
+  /** A mite that scuttles in beside (x, y): what splitters burst into and what an enraged boss calls. */
+  function spawnMiteAt(x, y) {
+    const mite = ENEMIES.mite;
+    state.enemies.push({
+      kind: 'mite',
+      x: clamp(x + range(random, -24, 24), 20, FIELD.width - 20),
+      y: clamp(y + range(random, -24, 24), 20, FIELD.height - 20),
+      radius: mite.radius,
+      hp: mite.hp,
+      maxHp: mite.hp,
+      speed: mite.speed * 1.15,
+      damage: mite.damage,
+      score: mite.score,
+      xp: mite.xp,
+      phase: random() * Math.PI * 2,
+      wobbleT: 0,
+      touchTimer: 0,
+      dashHurtTimer: 0,
+      chargeTimer: 0,
+      charging: 0,
+      telegraph: 0,
+      flash: 0,
+      shootTimer: 0,
+      enraged: false,
+      enrageTimer: 0,
+    });
+  }
+
   function killEnemy(index) {
     const enemy = state.enemies[index];
     const def = ENEMIES[enemy.kind];
@@ -242,6 +287,7 @@ export function createWorld(random) {
     state.kills += 1;
     state.combo += 1;
     state.comboTimer = SCORE.comboWindow;
+    state.roast = Math.min(ROAST.max, state.roast + ROAST.perKill);
     const multiplier = Math.min(1 + (state.combo - 1) * 0.1, SCORE.comboCap);
     const gained = Math.round(enemy.score * multiplier);
     state.score += gained;
@@ -250,11 +296,41 @@ export function createWorld(random) {
     if (enemy.kind === 'boss') {
       state.boss = null;
       state.score += SCORE.boss;
+      state.shake = Math.max(state.shake, 0.7);
       for (let i = 0; i < 5; i += 1) dropCherry(enemy.x + range(random, -50, 50), enemy.y + range(random, -50, 50), true);
+    } else if (enemy.kind === 'splitter') {
+      // A splitter bursts into two mites that scuttle off at once.
+      spawnMiteAt(enemy.x, enemy.y);
+      spawnMiteAt(enemy.x, enemy.y);
+      dropCherry(enemy.x, enemy.y, false);
     } else {
       dropCherry(enemy.x, enemy.y, false);
     }
     gainXp(enemy.xp);
+  }
+
+  /**
+   * Ledakan Sangrai: when the roast meter is full, every pest on the field
+   * takes the blast (the boss takes a bigger, flat hit). Returns true when
+   * the burst went off, false when the meter was not full yet.
+   */
+  function roastBurst() {
+    if (state.roast < ROAST.max) return false;
+    state.roast = 0;
+    state.shake = 1;
+    for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
+      const enemy = state.enemies[i];
+      enemy.hp -= enemy.kind === 'boss' ? ROAST.bossDamage : ROAST.burstDamage;
+      enemy.flash = 0.25;
+      burst(enemy.x, enemy.y, '#f2a541', 8, 200);
+      if (enemy.hp <= 0) killEnemy(i);
+    }
+    for (let i = state.enemyBullets.length - 1; i >= 0; i -= 1) {
+      burst(state.enemyBullets[i].x, state.enemyBullets[i].y, '#f2a541', 3, 90);
+    }
+    state.enemyBullets = [];
+    floater(state.player.x, state.player.y - 44, 'LEDAKAN SANGRAI!', '#f2a541');
+    return true;
   }
 
   function gainXp(amount) {
@@ -373,7 +449,45 @@ export function createWorld(random) {
         dx /= len;
         dy /= len;
       }
+      if (enemy.kind === 'spitter') {
+        enemy.shootTimer -= dt;
+        if (distance <= SPIT.holdRange) {
+          // Holds its ground, strafing sideways, and lobs acid at the guardian.
+          const strafe = Math.sin(enemy.wobbleT * 1.4 + enemy.phase);
+          const px = -dy * strafe;
+          const py = dx * strafe;
+          dx = px;
+          dy = py;
+          speed *= 0.5;
+          if (enemy.shootTimer <= 0 && distance < SPIT.shootRange) {
+            enemy.shootTimer = SPIT.secondsBetweenShots;
+            const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+            state.enemyBullets.push({
+              x: enemy.x + Math.cos(angle) * (enemy.radius + 4),
+              y: enemy.y + Math.sin(angle) * (enemy.radius + 4),
+              vx: Math.cos(angle) * SPIT.projectileSpeed,
+              vy: Math.sin(angle) * SPIT.projectileSpeed,
+              life: SPIT.life,
+            });
+            burst(enemy.x, enemy.y, '#5fb8a6', 3, 60);
+          }
+        }
+      }
       if (enemy.kind === 'boss') {
+        if (!enemy.enraged && enemy.hp <= enemy.maxHp / 2) {
+          enemy.enraged = true;
+          enemy.enrageTimer = 0;
+          floater(enemy.x, enemy.y - enemy.radius - 12, 'KUMBANG RAJA MURKA!', '#e5484d');
+          burst(enemy.x, enemy.y, '#e5484d', 24, 220);
+        }
+        if (enemy.enraged) {
+          speed *= 1.35;
+          enemy.enrageTimer -= dt;
+          if (enemy.enrageTimer <= 0) {
+            enemy.enrageTimer = 6;
+            for (let i = 0; i < 2; i += 1) spawnMiteAt(enemy.x, enemy.y);
+          }
+        }
         enemy.chargeTimer -= dt;
         if (enemy.telegraph > 0) {
           enemy.telegraph -= dt;
@@ -385,7 +499,7 @@ export function createWorld(random) {
           if (Math.random() < 0.4) burst(enemy.x, enemy.y, '#c9bd9f', 1, 40);
         } else if (enemy.chargeTimer <= 0) {
           enemy.telegraph = 0.5;
-          enemy.chargeTimer = 4;
+          enemy.chargeTimer = enemy.enraged ? 2.6 : 4;
         }
       }
       enemy.x += dx * speed * dt;
@@ -401,6 +515,7 @@ export function createWorld(random) {
         player.hp -= enemy.damage;
         player.hurtTimer = PLAYER.hurtGrace;
         hitPlayer = true;
+        state.shake = Math.max(state.shake, 0.35);
         // Knock the guardian back a little so hits read clearly.
         player.x = clamp(player.x + (afterDx / afterDistance) * 24, PLAYER.radius, FIELD.width - PLAYER.radius);
         player.y = clamp(player.y + (afterDy / afterDistance) * 24, PLAYER.radius, FIELD.height - PLAYER.radius);
@@ -473,6 +588,33 @@ export function createWorld(random) {
       if (dead) state.bullets.splice(i, 1);
     }
     return kills;
+  }
+
+  /** Acid globs the spitters lobbed: they fly straight, sting on touch, then fizzle. */
+  function stepEnemyBullets(dt) {
+    const player = state.player;
+    let hitPlayer = false;
+    for (let i = state.enemyBullets.length - 1; i >= 0; i -= 1) {
+      const glob = state.enemyBullets[i];
+      glob.x += glob.vx * dt;
+      glob.y += glob.vy * dt;
+      glob.life -= dt;
+      const dx = player.x - glob.x;
+      const dy = player.y - glob.y;
+      const reach = PLAYER.radius + SPIT.projectileRadius;
+      const hit = dx * dx + dy * dy < reach * reach;
+      if (hit && player.hurtTimer <= 0 && player.dashTimeLeft <= 0) {
+        player.hp -= SPIT.damage;
+        player.hurtTimer = PLAYER.hurtGrace;
+        state.shake = Math.max(state.shake, 0.3);
+        burst(player.x, player.y, '#5fb8a6', 6, 120);
+        hitPlayer = true;
+      }
+      if (hit || glob.life <= 0 || glob.x < 0 || glob.x > FIELD.width || glob.y < 0 || glob.y > FIELD.height) {
+        state.enemyBullets.splice(i, 1);
+      }
+    }
+    return hitPlayer;
   }
 
   function stepCherries(dt) {
@@ -568,8 +710,14 @@ export function createWorld(random) {
     action = stepPlayer(dt, move, aimAngle, wantDash);
     const kills = stepBullets(dt);
     if (stepEnemies(dt)) events |= EVENT_HIT;
+    if (stepEnemyBullets(dt)) events |= EVENT_HIT;
     const picked = stepCherries(dt);
     stepParticles(dt);
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 1.6);
+    if (state.banner) {
+      state.banner.timer -= dt;
+      if (state.banner.timer <= 0) state.banner = null;
+    }
 
     if (state.player.hp <= 0) events |= EVENT_OVER;
     if (state.levelUpChoices) events |= EVENT_LEVELUP;
@@ -611,6 +759,7 @@ export function createWorld(random) {
     step,
     stepAmbient,
     applyUpgrade,
+    roastBurst,
     /** The three choices on offer, or null when no level-up is waiting. */
     get levelUpChoices() {
       return state.levelUpChoices;

@@ -102,6 +102,28 @@ export const ENEMIES = {
     color: '#8a5a33',
     dark: '#5d3a1e',
   },
+  spitter: {
+    name: 'Kutu Sembur',
+    radius: 12,
+    hp: 26,
+    speed: 85,
+    damage: 6,
+    score: 25,
+    xp: 2,
+    color: '#5fb8a6',
+    dark: '#3a7d70',
+  },
+  splitter: {
+    name: 'Kutu Belah',
+    radius: 16,
+    hp: 30,
+    speed: 70,
+    damage: 10,
+    score: 25,
+    xp: 2,
+    color: '#c96a9b',
+    dark: '#8f3d68',
+  },
   boss: {
     name: 'Kumbang Raja',
     radius: 44,
@@ -123,14 +145,14 @@ export const ENEMIES = {
 export const WAVES = [
   { mix: [['aphid', 6]] },
   { mix: [['aphid', 9], ['mite', 4]] },
-  { mix: [['aphid', 10], ['mite', 8], ['moth', 3]] },
-  { mix: [['aphid', 12], ['moth', 6], ['beetle', 2]] },
-  { mix: [['aphid', 12], ['mite', 12], ['moth', 6], ['beetle', 3]] },
-  { mix: [['aphid', 14], ['mite', 14], ['moth', 9], ['beetle', 5]] },
-  { mix: [['aphid', 16], ['mite', 16], ['moth', 12], ['beetle', 7]] },
-  { mix: [['aphid', 18], ['mite', 18], ['moth', 14], ['beetle', 9]] },
-  { mix: [['aphid', 20], ['mite', 20], ['moth', 16], ['beetle', 11]] },
-  { mix: [['boss', 1], ['aphid', 10], ['mite', 10]] },
+  { mix: [['aphid', 10], ['mite', 8], ['moth', 3], ['spitter', 2]] },
+  { mix: [['aphid', 12], ['moth', 6], ['beetle', 2], ['spitter', 3]] },
+  { mix: [['aphid', 12], ['mite', 12], ['moth', 6], ['beetle', 3], ['spitter', 3], ['splitter', 2]] },
+  { mix: [['aphid', 14], ['mite', 14], ['moth', 9], ['beetle', 5], ['spitter', 4], ['splitter', 3]] },
+  { mix: [['aphid', 16], ['mite', 16], ['moth', 12], ['beetle', 7], ['spitter', 5], ['splitter', 4]] },
+  { mix: [['aphid', 18], ['mite', 18], ['moth', 14], ['beetle', 9], ['spitter', 6], ['splitter', 5]] },
+  { mix: [['aphid', 20], ['mite', 20], ['moth', 16], ['beetle', 11], ['spitter', 7], ['splitter', 6]] },
+  { mix: [['boss', 1], ['aphid', 10], ['mite', 10], ['spitter', 4]] },
 ];
 
 /** Enemy hit points scale a little every wave after the first. */
@@ -150,6 +172,29 @@ export const CHERRY = {
   dropChance: 0.22,
   magnetRadius: 130,
   life: 14,
+};
+
+/** The spitter's ranged attack: it holds its distance and lobs acid globs. */
+export const SPIT = {
+  /** It stops closing in once this close to the guardian. */
+  holdRange: 260,
+  /** It only shoots while the guardian is inside this range. */
+  shootRange: 380,
+  secondsBetweenShots: 2.4,
+  projectileSpeed: 230,
+  projectileRadius: 6,
+  damage: 8,
+  /** Seconds a glob flies before it fizzles out. */
+  life: 2.2,
+};
+
+/** Ledakan Sangrai: the roast meter fills as pests fall; at 100, E unleashes it. */
+export const ROAST = {
+  perKill: 5,
+  max: 100,
+  burstDamage: 90,
+  /** The boss only feels part of the blast. */
+  bossDamage: 120,
 };
 
 export const PALETTE = {

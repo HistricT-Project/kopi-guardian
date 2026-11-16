@@ -3,7 +3,7 @@
 // field of 1280x720 is scaled to fit the window, so the game looks the same
 // on any desktop size.
 
-import { CHERRY, ENEMIES, FIELD, FINAL_WAVE, FONT, PALETTE, PLAYER, SCORE, SPRAY } from './config.js';
+import { CHERRY, ENEMIES, FIELD, FINAL_WAVE, FONT, PALETTE, PLAYER, ROAST, SCORE, SPIT, SPRAY } from './config.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -221,6 +221,39 @@ export function createRenderer(canvas) {
       circle(0, 0, enemy.radius * 0.62, body);
       circle(-3, -3, 2, '#2a1a0c');
       circle(3, -3, 2, '#2a1a0c');
+    } else if (enemy.kind === 'spitter') {
+      // A teardrop body with a snout it lobs acid from.
+      ctx.beginPath();
+      ctx.ellipse(0, 0, enemy.radius, enemy.radius * 0.8, 0, 0, Math.PI * 2);
+      ctx.fillStyle = body;
+      ctx.fill();
+      ctx.fillStyle = def.dark;
+      ctx.beginPath();
+      ctx.ellipse(0, -enemy.radius * 0.5, 5, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      circle(-4, -2, 2, '#2a1a0c');
+      circle(4, -2, 2, '#2a1a0c');
+      ctx.strokeStyle = def.dark;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -enemy.radius * 0.8);
+      ctx.lineTo(0, -enemy.radius - 6);
+      ctx.stroke();
+    } else if (enemy.kind === 'splitter') {
+      // A cracked pink orb: two halves barely holding together.
+      circle(0, 0, enemy.radius, body);
+      ctx.strokeStyle = def.dark;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-enemy.radius * 0.4, -enemy.radius * 0.7);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(-enemy.radius * 0.3, enemy.radius * 0.7);
+      ctx.moveTo(enemy.radius * 0.5, -enemy.radius * 0.6);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(enemy.radius * 0.4, enemy.radius * 0.6);
+      ctx.stroke();
+      circle(-5, -3, 2.5, '#2a1a0c');
+      circle(5, -3, 2.5, '#2a1a0c');
     } else if (enemy.kind === 'beetle' || enemy.kind === 'boss') {
       const big = enemy.kind === 'boss';
       circle(0, 0, enemy.radius, body);
@@ -272,6 +305,19 @@ export function createRenderer(canvas) {
       ctx.fillRect(enemy.x - width / 2, enemy.y - enemy.radius - 12, width, 5);
       ctx.fillStyle = PALETTE.hp;
       ctx.fillRect(enemy.x - width / 2, enemy.y - enemy.radius - 12, width * (enemy.hp / enemy.maxHp), 5);
+    }
+    // The boss flashes its rage once it is enraged.
+    if (enemy.kind === 'boss' && enemy.enraged) {
+      text('MURKA', enemy.x, enemy.y - enemy.radius - 24, 13, PALETTE.danger);
+    }
+  }
+
+  /** Acid globs lobbed by spitters: green, wobbling, best dodged. */
+  function drawEnemyBullets(state) {
+    for (const glob of state.enemyBullets) {
+      const pulse = 1 + Math.sin(state.time * 8 + glob.x) * 0.12;
+      circle(glob.x, glob.y, SPIT.projectileRadius * pulse, '#5fb8a6');
+      circle(glob.x - 2, glob.y - 2, 2, '#a5e8d8');
     }
   }
 
@@ -340,8 +386,21 @@ export function createRenderer(canvas) {
     ctx.strokeText(xpLabel, FIELD.width / 2, FIELD.height - 11);
     ctx.fillStyle = PALETTE.text;
     ctx.fillText(xpLabel, FIELD.width / 2, FIELD.height - 11);
+    // Roast meter, bottom-left: fills as pests fall; at 100, E unleashes Ledakan Sangrai.
+    const roastReady = state.roast >= ROAST.max;
+    const roastPulse = roastReady ? 0.7 + 0.3 * Math.sin(state.time * 6) : 1;
+    ctx.globalAlpha = roastPulse;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(14, FIELD.height - 52, 220, 16);
+    ctx.fillStyle = '#f2a541';
+    ctx.fillRect(16, FIELD.height - 50, 216 * (state.roast / ROAST.max), 12);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = PALETTE.panelEdge;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(14, FIELD.height - 52, 220, 16);
+    text(roastReady ? 'SANGRAI SIAP — tekan E!' : `SANGRAI ${Math.floor(state.roast)}`, 244, FIELD.height - 44, 14, roastReady ? '#f2a541' : PALETTE.muted, 'left', 700);
     // Controls hint just above the bar, where the garden is dark.
-    text('WASD gerak · Mouse arah · Space/Shift dash · P jeda · M suara', FIELD.width / 2, FIELD.height - 36, 13, PALETTE.muted, 'center', 500);
+    text('WASD gerak · Mouse arah · Space/Shift dash · E ledakan · P jeda · M suara', FIELD.width / 2, FIELD.height - 36, 13, PALETTE.muted, 'center', 500);
     if (ui.muted) text('SUARA MATI (M)', width - 20, FIELD.height - 44, 14, PALETTE.muted, 'right');
   }
 
@@ -394,7 +453,11 @@ export function createRenderer(canvas) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#14100a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+    // Screen shake: the whole field jolts on hits, the roast burst and the boss's fall.
+    const shake = state.shake || 0;
+    const shakeX = shake > 0 ? (Math.random() * 2 - 1) * shake * 10 : 0;
+    const shakeY = shake > 0 ? (Math.random() * 2 - 1) * shake * 10 : 0;
+    ctx.setTransform(scale, 0, 0, scale, offsetX + shakeX * scale, offsetY + shakeY * scale);
     const time = state.time;
 
     drawGarden(time);
@@ -412,6 +475,7 @@ export function createRenderer(canvas) {
         { text: 'WASD / panah untuk bergerak  ·  Mouse untuk mengarahkan semprotan', size: 20 },
         { text: 'Semprotan biji kopi menembak sendiri  ·  Space / Shift untuk dash', size: 20 },
         { text: 'Kalahkan hama, kumpulkan cherry, naik level, pilih upgrade', size: 20 },
+        { text: 'Isi meter Sangrai — tekan E untuk Ledakan Sangrai!', size: 20, color: PALETTE.gold },
         { text: 'Gelombang 10: Kumbang Raja. Kalahkan dia dan kebun selamat!', size: 20, color: PALETTE.gold },
         { text: 'Tekan SPASI atau KLIK untuk mulai', size: 26, color: PALETTE.gold, gap: 64 },
       ], PALETTE.gold);
@@ -422,9 +486,26 @@ export function createRenderer(canvas) {
     for (const cherry of state.cherries) drawCherry(cherry);
     for (const bullet of state.bullets) drawBullet(bullet);
     for (const enemy of state.enemies) drawEnemy(enemy, time);
+    drawEnemyBullets(state);
     drawPlayer(state.player, time);
     drawParticles(state);
     drawHud(state, ui);
+
+    // A wave banner rides over the garden for a moment when a wave starts.
+    if (state.banner) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, state.banner.timer));
+      text(state.banner.text, FIELD.width / 2, 180, 44, PALETTE.gold);
+      ctx.globalAlpha = 1;
+    }
+
+    // Low health: a red edge pulses around the field.
+    if (state.player.hp > 0 && state.player.hp / state.player.maxHp < 0.3) {
+      ctx.globalAlpha = 0.25 + 0.2 * Math.sin(time * 5);
+      ctx.strokeStyle = PALETTE.danger;
+      ctx.lineWidth = 14;
+      ctx.strokeRect(7, 7, FIELD.width - 14, FIELD.height - 14);
+      ctx.globalAlpha = 1;
+    }
 
     if (screen === SCREEN_LEVELUP && ui.choices) {
       ctx.fillStyle = 'rgba(10, 8, 5, 0.55)';
