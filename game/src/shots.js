@@ -106,8 +106,14 @@ export function stageShot(name, world) {
       break;
     }
     if (result.events & EVENT_LEVELUP) {
-      leveled = true;
-      break;
+      // Only the levelup scene stops to show the choice. The other scenes
+      // take the first upgrade and keep playing, like a hurried player.
+      if (name === 'levelup') {
+        leveled = true;
+        break;
+      }
+      const choices = world.state.levelUpChoices;
+      if (choices && choices.length > 0) world.applyUpgrade(choices[0].id);
     }
   }
   if (won) return { screen: SCREEN_WIN, best: world.state.score, choices: null };

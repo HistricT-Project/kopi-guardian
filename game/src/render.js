@@ -302,7 +302,7 @@ export function createRenderer(canvas) {
     ctx.fillRect(86, 26, 210, 18);
     ctx.fillStyle = PALETTE.hp;
     ctx.fillRect(86, 26, 210 * Math.max(0, player.hp / player.maxHp), 18);
-    text(`${Math.ceil(player.hp)} / ${player.maxHp}`, 191, 36, 14, PALETTE.text);
+    text(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp}`, 191, 36, 14, PALETTE.text);
     text(`Dash: ${player.dashCooldownLeft <= 0 ? 'SIAP' : '...'}`, 30, 59, 13, PALETTE.muted, 'left', 600);
     // Top-centre: wave and timer.
     text(`WAVE ${Math.min(state.wave, FINAL_WAVE)} / ${FINAL_WAVE}`, width / 2, 30, 26, PALETTE.text);
@@ -326,12 +326,22 @@ export function createRenderer(canvas) {
       ctx.fillRect(width / 2 - 214, 84, 428 * Math.max(0, boss.hp / boss.maxHp), 14);
       text('KUMBANG RAJA', width / 2, 91, 14, PALETTE.text);
     }
-    // Bottom: XP bar.
+    // Bottom: XP bar. The numbers are stroked so they read on gold and on dark alike.
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(0, FIELD.height - 22, FIELD.width, 22);
     ctx.fillStyle = PALETTE.xp;
     ctx.fillRect(0, FIELD.height - 22, FIELD.width * (player.xp / player.xpNext), 22);
-    text(`XP ${player.xp} / ${player.xpNext}  ·  WASD gerak · Mouse arah · Space/Shift dash · P jeda · M suara`, FIELD.width / 2, FIELD.height - 11, 13, '#2a1a0c');
+    const xpLabel = `XP ${player.xp} / ${player.xpNext}`;
+    ctx.font = `700 13px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.strokeText(xpLabel, FIELD.width / 2, FIELD.height - 11);
+    ctx.fillStyle = PALETTE.text;
+    ctx.fillText(xpLabel, FIELD.width / 2, FIELD.height - 11);
+    // Controls hint just above the bar, where the garden is dark.
+    text('WASD gerak · Mouse arah · Space/Shift dash · P jeda · M suara', FIELD.width / 2, FIELD.height - 36, 13, PALETTE.muted, 'center', 500);
     if (ui.muted) text('SUARA MATI (M)', width - 20, FIELD.height - 44, 14, PALETTE.muted, 'right');
   }
 

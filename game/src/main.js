@@ -85,6 +85,18 @@ function runGame() {
   let accumulator = 0;
   let last = performance.now();
 
+  // A read-only handle for playtesting and screenshots: the live state and screen.
+  window.__kopi = {
+    get state() {
+      return world.state;
+    },
+    get screen() {
+      return screen;
+    },
+    get best() {
+      return best;
+    },
+  };
   // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
   function announce(message) {
     status.textContent = message;
